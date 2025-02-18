@@ -1,0 +1,204 @@
+---
+title: "Homework 4 - https://github.com/Henryblake2777/Homework3"
+author: "Henry Blake - hrb987"
+date: "2025-02-17"
+output:
+  pdf_document:
+    toc: True
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      eval = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.align = "center")
+
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(rvest)
+library(mosaic)
+
+letter_freq <- read_csv('letter_frequencies.csv')
+```
+
+# Problem 1 - Iron Bank
+
+## Null Hypothesis - 
+
+H0 -> P = .024
+
+## Test Statistic -
+
+TS = 0.0346 - 0.024 = 0.0106
+
+## P-Value -
+
+```{r}
+sim_trades <- do(100000)*nflip(n = 2001, prob = .024)
+sum(sim_trades >= 70)/100000
+
+```
+
+## Probability Distribution -
+
+```{r}
+ggplot(sim_trades) + geom_histogram(aes(x = nflip), color = 'black', fill = '#B9375E') + labs(
+  title = 'Distribution of Trials Over 70 Flagged Trails'
+)
+```
+
+## Conclusion -
+
+Due to a p-value of .0013, there is significant evidence that the 70 flagged by the detection algorithm were unusually high and not due to simple variability.
+
+# Problem 2 - Health Inspections - 
+
+## Null Hypothesis - 
+
+H0 -> P = .03
+
+## Test Statistic -
+
+TS  = .16 - .03 = .13
+
+## P-Value -
+
+```{r}
+sim_health <- do(100000)*nflip(n = 50, prob = .03)
+sum(sim_trades >= 8)/100000
+
+```
+
+## Probability Distribution -
+
+```{r}
+ggplot(sim_health) + geom_histogram(aes(x = nflip), color = 'black', fill = '#BE9A60',binwidth = 1) + labs(
+  title = 'Distribution of Trials Over 8 Failed Inspections',
+  x = 'Proportion'
+)
+```
+
+## Conclusion -
+
+Due to a p-value of practically 0, there is very significant evidence that the 8 failed health inspections by Gourmet Bites are not due to normal factors.
+
+# Problem 3 - Jury Selection
+
+## Null Hypothesis - 
+
+H0 -> Observed frequencies are consistent with the model
+
+## Test Statistic -
+
+Ts = chi2 = 12.43
+
+## Chi-Squared Value -
+
+```{r}
+expected <- c(Group1 = .3*240, Group2 = .25*240, Group3 = .2*240, Group4 = .15*240, Group5 = .1*240)
+observed <- c(Group1 = 85, Group2 = 56, Group3 = 59, Group4 = 27, Group5 = 13)
+
+chi_squared_statistic = function(observed, expected) {
+  sum((observed - expected)^2 / expected)
+}
+
+juror_chi2 <- chi_squared_statistic(observed, expected)
+
+chi2_sim = do(100000)*{
+  simulated_counts = rmultinom(1, 240, expected)
+  this_chi2 = chi_squared_statistic(simulated_counts, expected)
+  c(chi2 = this_chi2) # return a vector with names and values
+}
+
+sum(chi2_sim > juror_chi2)/100000
+```
+
+## Probability Distribution -
+
+```{r}
+ggplot(chi2_sim) + geom_histogram(aes(x = chi2), color = 'black', fill = '#CEDDBB',binwidth = 1) + labs(
+  title = 'Distribution of Chi-Squared values',
+  x = 'chi-squared'
+)
+```
+
+## Conclusion -
+
+Due to a p-value of .0143, there is intriguing evidence that the distribution of jurors selected by the judge does not follow the expected distribution. However, a confounding variable that may affect this could be the type of cases that the judge works.
+
+# Problem 4 - LLM Watermarking
+
+## Part A: Null Distribution - 
+
+```{r}
+sentences <- readLines('brown_sentences.txt')
+clean_sentences = gsub("[^A-Za-z] ", "", sentences)
+clean_sentences = gsub('\\.', "", clean_sentences)
+clean_sentences = gsub(' ', "", clean_sentences)
+clean_sentences = toupper(clean_sentences)
+letter_chi2s <- c()
+for (sentence in clean_sentences){
+  all_letters <- LETTERS
+  observed <- table(strsplit(sentence, '')[[1]])
+  for (letter in all_letters){
+    if (!(letter %in% names(observed))){
+      observed[letter] <- 0
+    }
+  }
+  observed <- observed[all_letters]
+  expected <- letter_freq$Probability * nchar(sentence)
+  names(expected) <- letter_freq$Letter
+  letter_chi2 <- chi_squared_statistic(observed, expected)
+  letter_chi2s <- c(letter_chi2s, letter_chi2)
+}
+ggplot() + geom_histogram(aes(x = letter_chi2s), color = 'black', fill = '#434343') + labs(
+  title = 'Distribution of Chi-Squared values',
+  x = 'chi-squared'
+)
+```
+
+## Part B: Checking For a Watermark - 
+
+```{r}
+test_sentences <- c(
+  "She opened the book and started to read the first chapter, eagerly anticipating what might come next.",
+  "Despite the heavy rain, they decided to go for a long walk in the park, crossing the main avenue by the fountain in the center.",
+  "The museum’s new exhibit features ancient artifacts from various civilizations around the world.",
+  "He carefully examined the document, looking for any clues that might help solve the mystery.",
+  "The students gathered in the auditorium to listen to the guest speaker’s inspiring lecture.",
+  "Feeling vexed after an arduous and zany day at work, she hoped for a peaceful and quiet evening at home, cozying up after a quick dinner with some TV, or maybe a book on her upcoming visit to Auckland.",
+  "The chef demonstrated how to prepare a delicious meal using only locally sourced ingredients, focusing mainly on some excellent dinner recipes from Spain.",
+  "They watched the sunset from the hilltop, marveling at the beautiful array of colors in the sky.",
+  "The committee reviewed the proposal and provided many points of useful feedback to improve the project’s effectiveness.",
+  "Despite the challenges faced during the project, the team worked tirelessly to ensure its successful completion, resulting in a product that exceeded everyone’s expectations."
+)
+
+# Example loop to print each sentence
+clean_test_sentences = gsub("[^A-Za-z] ", "", test_sentences)
+clean_test_sentences = gsub('\\.', "", clean_test_sentences)
+clean_test_sentences = gsub(' ', "", clean_test_sentences)
+clean_test_sentences = toupper(clean_test_sentences)
+letter_Ps_test <- c()
+for (sentence in clean_test_sentences){
+  all_letters <- LETTERS
+  observed <- table(strsplit(sentence, '')[[1]])
+  for (letter in all_letters){
+    if (!(letter %in% names(observed))){
+      observed[letter] <- 0
+    }
+  }
+  observed <- observed[all_letters]
+  expected <- letter_freq$Probability * nchar(sentence)
+  names(expected) <- letter_freq$Letter
+  letter_chi2_test <- chi_squared_statistic(observed, expected)
+  letter_P_test <- round(sum(letter_chi2s > letter_chi2_test)/length(letter_chi2s),3)
+  letter_Ps_test <- c(letter_Ps_test, letter_P_test)
+  
+}
+print(letter_Ps_test)
+```
+
+According to the p-values of the chi-squared statistics, sentence 6 seems to be the one that is watermarked because of the p-value of .009. It does not seem to follow the typical letter frequency distribution.
